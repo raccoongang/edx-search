@@ -433,6 +433,7 @@ class ElasticSearchEngine(SearchEngine):
                facet_terms=None,
                exclude_ids=None,
                use_field_match=False,
+               sort=None,
                **kwargs):  # pylint: disable=too-many-arguments, too-many-locals, too-many-branches
         """
         Implements call to search the index for the desired content.
@@ -587,6 +588,11 @@ class ElasticSearchEngine(SearchEngine):
             }
 
         body = {"query": query}
+
+        if sort:
+            body.update({
+                "sort": {sort: {"order": "desc"}}  # desc, asc
+            })
         if facet_terms:
             facet_query = _process_facet_terms(facet_terms)
             if facet_query:
