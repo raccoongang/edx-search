@@ -434,6 +434,7 @@ class ElasticSearchEngine(SearchEngine):
                exclude_ids=None,
                use_field_match=False,
                sort=None,
+               raw_filters=None,
                **kwargs):  # pylint: disable=too-many-arguments, too-many-locals, too-many-branches
         """
         Implements call to search the index for the desired content.
@@ -533,6 +534,9 @@ class ElasticSearchEngine(SearchEngine):
 
         elastic_queries = []
         elastic_filters = []
+
+        if raw_filters:
+            elastic_filters.extend(raw_filters)
 
         # We have a query string, search all fields for matching text within the "content" node
         if query_string:

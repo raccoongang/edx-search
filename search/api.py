@@ -65,7 +65,7 @@ def perform_search(
     return results
 
 
-def course_discovery_search(search_term=None, size=20, from_=0, field_dictionary=None, catalog_visibility='all', sort=None):
+def course_discovery_search(search_term=None, size=20, from_=0, field_dictionary=None, catalog_visibility='all', sort=None, states='all'):
     """
     Course Discovery activities against the search engine index of course details
     """
@@ -87,6 +87,12 @@ def course_discovery_search(search_term=None, size=20, from_=0, field_dictionary
     if not searcher:
         raise NoSearchEngineError("No search engine specified in settings.SEARCH_ENGINE")
 
+    raw_filters = []
+    if not states:
+        raw_filters.append({"term": {"approved_states": "FAKE_STATE"}})
+    elif states != 'all':
+        raw_filters.append({"or": [{"term": {"approved_states": s}} for s in states]})
+
     results = searcher.search(
         query_string=search_term,
         doc_type="course_info",
@@ -98,7 +104,8 @@ def course_discovery_search(search_term=None, size=20, from_=0, field_dictionary
         filter_dictionary={"enrollment_end": DateRange(datetime.utcnow(), None)},
         exclude_dictionary=exclude_dictionary,
         facet_terms=course_discovery_facets(),
-        sort=sort
+        sort=sort,
+        raw_filters=raw_filters
     )
 
     return results
