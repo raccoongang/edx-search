@@ -200,7 +200,7 @@ def course_discovery(request):
             field_dictionary=field_dictionary,
             catalog_visibility=catalog_visibility,
             sort=sort,
-            states
+            states=states
         )
 
         # Analytics - log search results before sending to browser
