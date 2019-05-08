@@ -5,7 +5,7 @@ from setuptools import setup
 
 setup(
     name='edx-search',
-    version='0.1.2',
+    version='ficus.0.1.3',
     description='Search and Index routines for index access',
     author='edX',
     author_email='oscm@edx.org',
