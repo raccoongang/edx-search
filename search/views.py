@@ -174,8 +174,8 @@ def course_discovery(request):
 
     search_term = request.POST.get("search_string", None)
     catalog_visibility = request.POST.get("catalog_visibility", "all")
-    sort = request.POST.get("sort", '')
-    order = request.POST.get("order", '')
+    sort = request.POST.get("sort", None)
+    order = request.POST.get("order", None)
 
     try:
         size, from_, page = _process_pagination_values(request)

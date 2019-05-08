@@ -484,9 +484,9 @@ class ElasticSearchEngine(SearchEngine):
             (deprecated) exclude_ids (list): list of id values to exclude from the results -
             useful for finding maches that aren't "one of these"
 
-            sort (string): the string of value to sort the result by name of field
+            sort (string): field's name for sorting the searching result
 
-            order (string): the string of value to order sorting in desc or asc (default value) order
+            order (string): order sorting the searching result, desc or asc (default value)
 
         Returns:
             dict object with results in the desired format
