@@ -443,6 +443,7 @@ class ElasticSearchEngine(SearchEngine):
                exclude_ids=None,
                use_field_match=False,
                sort=None,
+               order="asc",
                **kwargs):  # pylint: disable=too-many-arguments, too-many-locals, too-many-branches
         """
         Implements call to search the index for the desired content.
@@ -482,6 +483,10 @@ class ElasticSearchEngine(SearchEngine):
 
             (deprecated) exclude_ids (list): list of id values to exclude from the results -
             useful for finding maches that aren't "one of these"
+
+            sort (string): the string of value to sort the result by name of field
+
+            order (string): the string of value to order sorting in desc or asc (default value) order
 
         Returns:
             dict object with results in the desired format
@@ -598,8 +603,9 @@ class ElasticSearchEngine(SearchEngine):
         body = {"query": query}
 
         if sort:
+            order = order if order in ("desc", "asc") else "asc"
             body.update({
-                "sort": {sort: {"order": "asc"}}  # desc, asc
+                "sort": {sort: {"order": order}}
             })
 
         if facet_terms:

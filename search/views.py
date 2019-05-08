@@ -175,6 +175,7 @@ def course_discovery(request):
     search_term = request.POST.get("search_string", None)
     catalog_visibility = request.POST.get("catalog_visibility", "all")
     sort = request.POST.get("sort", '')
+    order = request.POST.get("order", '')
 
     try:
         size, from_, page = _process_pagination_values(request)
@@ -189,6 +190,7 @@ def course_discovery(request):
                 "page_number": page,
                 "catalog_visibility": catalog_visibility,
                 "sort": sort,
+                'order': order,
             }
         )
 
@@ -199,6 +201,7 @@ def course_discovery(request):
             field_dictionary=field_dictionary,
             catalog_visibility=catalog_visibility,
             sort=sort,
+            order=order,
         )
 
         # Analytics - log search results before sending to browser
