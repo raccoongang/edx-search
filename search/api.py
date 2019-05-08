@@ -65,7 +65,16 @@ def perform_search(
     return results
 
 
-def course_discovery_search(search_term=None, size=20, from_=0, field_dictionary=None, catalog_visibility='all', sort=None, order=''):
+def course_discovery_search(
+    search_term=None,
+    size=20,
+    from_=0,
+    field_dictionary=None,
+    catalog_visibility='all',
+    sort=None,
+    order=''
+):
+
     """
     Course Discovery activities against the search engine index of course details
     """
