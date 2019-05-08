@@ -605,7 +605,7 @@ class ElasticSearchEngine(SearchEngine):
         if sort:
             order = order if order in ("desc", "asc") else "asc"
             body.update({
-                "sort": {sort: {"order": order}}
+                "sort": {sort: {"order": order, "ignore_unmapped": True}}
             })
 
         if facet_terms:
