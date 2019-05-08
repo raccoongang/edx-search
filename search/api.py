@@ -65,7 +65,16 @@ def perform_search(
     return results
 
 
-def course_discovery_search(search_term=None, size=20, from_=0, field_dictionary=None, catalog_visibility='all'):
+def course_discovery_search(
+    search_term=None,
+    size=20,
+    from_=0,
+    field_dictionary=None,
+    catalog_visibility='all',
+    sort=None,
+    order=None,
+):
+
     """
     Course Discovery activities against the search engine index of course details
     """
@@ -98,6 +107,8 @@ def course_discovery_search(search_term=None, size=20, from_=0, field_dictionary
         filter_dictionary={"enrollment_end": DateRange(datetime.utcnow(), None)},
         exclude_dictionary=exclude_dictionary,
         facet_terms=course_discovery_facets(),
+        sort=sort,
+        order=order,
     )
 
     return results
