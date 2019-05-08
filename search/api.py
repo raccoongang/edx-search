@@ -72,7 +72,7 @@ def course_discovery_search(
     field_dictionary=None,
     catalog_visibility='all',
     sort=None,
-    order=''
+    order=None,
 ):
 
     """
