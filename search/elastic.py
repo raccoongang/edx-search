@@ -8,7 +8,6 @@ from django.core.cache import cache
 from elasticsearch import Elasticsearch, exceptions
 from elasticsearch.helpers import bulk, BulkIndexError
 
-from search.api import QueryParseError
 from search.search_engine_base import SearchEngine
 from search.utils import ValueRange, _is_iterable
 
@@ -39,23 +38,29 @@ def _translate_hits(es_response):
 
     def translate_facet(result):
         """ Any conversion from ES facet syntax into our search engine sytax """
-        terms = {term["term"]: term["count"] for term in result["terms"]}
+        total = 0
+        terms = {}
+        for bucket in result["buckets"]:
+            terms[bucket["key"]] = bucket["doc_count"]
+            total += bucket["doc_count"]
         return {
             "terms": terms,
-            "total": result["total"],
-            "other": result["other"],
+            "total": total,
         }
 
     results = [translate_result(hit) for hit in es_response["hits"]["hits"]]
     response = {
         "took": es_response["took"],
-        "total": es_response["hits"]["total"],
+        "total": es_response["hits"]["total"]["value"],
         "max_score": es_response["hits"]["max_score"],
         "results": results,
     }
 
-    if "facets" in es_response:
-        response["facets"] = {facet: translate_facet(es_response["facets"][facet]) for facet in es_response["facets"]}
+    if "aggregations" in es_response:
+        response["aggs"] = {
+            agg_key: translate_facet(es_response["aggregations"][agg_key])
+            for agg_key in es_response["aggregations"]
+        }
 
     return response
 
@@ -66,9 +71,9 @@ def _get_filter_field(field_name, field_value):
     if isinstance(field_value, ValueRange):
         range_values = {}
         if field_value.lower:
-            range_values.update({"gte": field_value.lower_string})
+            range_values["gte"] = field_value.lower_string
         if field_value.upper:
-            range_values.update({"lte": field_value.upper_string})
+            range_values["lte"] = field_value.upper_string
         filter_field = {
             "range": {
                 field_name: range_values
@@ -118,27 +123,20 @@ def _process_filters(filter_dictionary):
     and matches, then we can include, OR if the field is undefined, then we
     assume it is safe to include
     """
-    def filter_item(field):
-        """ format elasticsearch filter to pass if value matches OR field is not included """
-        if filter_dictionary[field] is not None:
-            return {
-                "or": [
-                    _get_filter_field(field, filter_dictionary[field]),
-                    {
-                        "missing": {
-                            "field": field
-                        }
+    filter_expression = []
+    for field in filter_dictionary:
+        if filter_dictionary[field]:
+            filter_expression.extend([_get_filter_field(field, filter_dictionary[field])])
+        filter_expression.extend([
+            {
+                "bool": {
+                    "must_not": {
+                        "exists": {"field": field},
                     }
-                ]
+                }
             }
-
-        return {
-            "missing": {
-                "field": field
-            }
-        }
-
-    return [filter_item(field) for field in filter_dictionary]
+        ])
+    return filter_expression
 
 
 def _process_exclude_dictionary(exclude_dictionary):
@@ -154,18 +152,7 @@ def _process_exclude_dictionary(exclude_dictionary):
             exclude_values = [exclude_values]
         not_properties.extend([{"term": {exclude_property: exclude_value}} for exclude_value in exclude_values])
 
-    # Returning a query segment with an empty list freaks out ElasticSearch,
-    #   so just return an empty segment.
-    if not not_properties:
-        return {}
-
-    return {
-        "not": {
-            "filter": {
-                "or": not_properties
-            }
-        }
-    }
+    return not_properties
 
 
 def _process_facet_terms(facet_terms):
@@ -251,11 +238,7 @@ class ElasticSearchEngine(SearchEngine):
 
         # Fall back to Elasticsearch
         if not mapping:
-            mapping = self._es.indices.get_mapping(
-                index=self.index_name,
-                doc_type=doc_type,
-            ).get(self.index_name, {}).get('mappings', {}).get(doc_type, {})
-
+            mapping = self._es.indices.get_mapping(index=self.index_name).get(self.index_name, {}).get('mappings', {})
             # Cache the mapping, if one was retrieved
             if mapping:
                 ElasticSearchEngine.set_mappings(
@@ -329,8 +312,7 @@ class ElasticSearchEngine(SearchEngine):
                 prop_val = {"properties": props}
             else:
                 prop_val = {
-                    "type": "string",
-                    "index": "not_analyzed",
+                    "type": "keyword"
                 }
 
             return prop_val
@@ -344,12 +326,7 @@ class ElasticSearchEngine(SearchEngine):
         if new_properties:
             self._es.indices.put_mapping(
                 index=self.index_name,
-                doc_type=doc_type,
-                body={
-                    doc_type: {
-                        "properties": new_properties,
-                    }
-                }
+                body={"properties": new_properties,}
             )
             self._clear_mapping(doc_type)
 
@@ -367,18 +344,13 @@ class ElasticSearchEngine(SearchEngine):
                 log.debug("indexing %s object with id %s", doc_type, id_)  # lint-amnesty, pylint: disable=unicode-format-string
                 action = {
                     "_index": self.index_name,
-                    "_type": doc_type,
                     "_id": id_,
                     "_source": source
                 }
                 actions.append(action)
             # bulk() returns a tuple with summary information
             # number of successfully executed actions and number of errors if stats_only is set to True.
-            _, indexing_errors = bulk(
-                self._es,
-                actions,
-                **kwargs
-            )
+            _, indexing_errors = bulk(self._es, actions, **kwargs)
             if indexing_errors:
                 ElasticSearchEngine.log_indexing_error(indexing_errors)
         # Broad exception handler to protect around bulk call
@@ -399,7 +371,6 @@ class ElasticSearchEngine(SearchEngine):
                 action = {
                     '_op_type': 'delete',
                     "_index": self.index_name,
-                    "_type": doc_type,
                     "_id": doc_id
                 }
                 actions.append(action)
@@ -546,13 +517,11 @@ class ElasticSearchEngine(SearchEngine):
             })
 
         if field_dictionary:
-            if use_field_match:
-                elastic_queries.extend(_process_field_queries(field_dictionary))
-            else:
-                elastic_filters.extend(_process_field_filters(field_dictionary))
+            # strict match of transferred fields
+                elastic_queries += _process_field_filters(field_dictionary)
 
         if filter_dictionary:
-            elastic_filters.extend(_process_filters(filter_dictionary))
+            elastic_filters += _process_filters(filter_dictionary)
 
         # Support deprecated argument of exclude_ids
         if exclude_ids:
@@ -562,12 +531,10 @@ class ElasticSearchEngine(SearchEngine):
                 exclude_dictionary["_id"] = []
             exclude_dictionary["_id"].extend(exclude_ids)
 
-        if exclude_dictionary:
-            elastic_filters.append(_process_exclude_dictionary(exclude_dictionary))
-
         query_segment = {
             "match_all": {}
         }
+
         if elastic_queries:
             query_segment = {
                 "bool": {
@@ -579,35 +546,37 @@ class ElasticSearchEngine(SearchEngine):
         if elastic_filters:
             filter_segment = {
                 "bool": {
-                    "must": elastic_filters
+                    "should": elastic_filters
                 }
             }
             query = {
-                "filtered": {
-                    "query": query_segment,
+                "bool": {
+                    "must": query_segment,
                     "filter": filter_segment,
                 }
             }
+
+        if exclude_dictionary:
+            if query.get('bool'):
+                query['bool']['must_not'] = _process_exclude_dictionary(exclude_dictionary)
+            else:
+                query = {
+                    "bool": {
+                        "must_not": _process_exclude_dictionary(exclude_dictionary)
+                    }
+                }
 
         body = {"query": query}
         if facet_terms:
             facet_query = _process_facet_terms(facet_terms)
             if facet_query:
-                body["facets"] = facet_query
+                body["aggs"] = facet_query
 
         try:
-            es_response = self._es.search(
-                index=self.index_name,
-                body=body,
-                **kwargs
-            )
+            es_response = self._es.search(index=self.index_name, body=body, **kwargs)
         except exceptions.ElasticsearchException as ex:
-            message = str(ex)
-            if 'QueryParsingException' in message:
-                log.exception("Malformed search query: %s", message)  # lint-amnesty, pylint: disable=unicode-format-string
-                raise QueryParseError('Malformed search query.')
             # log information and re-raise
-            log.exception("error while searching index - %s", str(message))  # lint-amnesty, pylint: disable=unicode-format-string
+            log.exception("error while searching index - %s", str(ex))
             raise
 
         return _translate_hits(es_response)
