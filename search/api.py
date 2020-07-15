@@ -27,16 +27,6 @@ class NoSearchEngineError(Exception):
     """ NoSearchEngineError exception to be thrown if no search engine is specified """
 
 
-class QueryParseError(Exception):
-    """QueryParseError will be thrown if the query is malformed.
-
-    If a query has mismatched quotes (e.g. '"some phrase', return a
-    more specific exception so the view can provide a more helpful
-    error message to the user.
-
-    """
-
-
 def perform_search(
         search_term,
         user=None,
@@ -62,7 +52,6 @@ def perform_search(
         exclude_dictionary=exclude_dictionary,
         size=size,
         from_=from_,
-        doc_type="courseware_content",
     )
 
     # post-process the result
@@ -96,7 +85,6 @@ def course_discovery_search(search_term=None, size=20, from_=0, field_dictionary
 
     results = searcher.search(
         query_string=search_term,
-        doc_type="course_info",
         size=size,
         from_=from_,
         # only show when enrollment start IS provided and is before now
