@@ -50,21 +50,20 @@ class ElasticSearchTests(MockSearchTests):
         Test that facet options work alongside facets  - notice unsupported in mock for now
             size - is the only option for now
         """
-        self._index_for_facets()
+        self._index_for_aggs()
 
         response = self.searcher.search()
         self.assertEqual(response["total"], 7)
-        self.assertNotIn("facets", response)
+        self.assertNotIn("aggs", response)
 
         facet_terms = {
-            "subject": {"size": 2},
+            "subject": {"size": 3},
             "org": {"size": 2}
         }
         response = self.searcher.search(facet_terms=facet_terms)
         self.assertEqual(response["total"], 7)
-        self.assertIn("facets", response)
-        facet_results = response["facets"]
-
+        self.assertIn("aggs", response)
+        facet_results = response["aggs"]
         self.assertEqual(facet_results["subject"]["total"], 6)
         subject_term_counts = facet_results["subject"]["terms"]
         self.assertEqual(subject_term_counts["mathematics"], 3)

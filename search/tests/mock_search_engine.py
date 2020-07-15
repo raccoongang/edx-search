@@ -415,6 +415,6 @@ class MockSearchEngine(SearchEngine):
         }
 
         if facet_terms:
-            response["facets"] = _count_facet_values(documents_to_search, facet_terms)
+            response["aggs"] = _count_facet_values(documents_to_search, facet_terms)
 
         return response

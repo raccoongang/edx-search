@@ -99,23 +99,6 @@ class MockSearchTests(TestCase, SearcherMixin):
         self.assertEqual(test_0["name"], test_string)
         self.assertEqual(test_1["value"], test_string)
 
-    def test_find_doctype(self):
-        """ Make sure that searches for specific doc_type only return requested doc_type """
-        test_string = "A test string"
-        self.searcher.index("test_doc", [{"name": test_string}])
-
-        # search by doc_type
-        response = self.searcher.search(None, doc_type="test_doc")
-        self.assertEqual(response["total"], 1)
-
-        response = self.searcher.search(None, doc_type="not_test_doc")
-        self.assertEqual(response["total"], 0)
-
-        self.searcher.index("not_test_doc", [{"value": test_string}])
-
-        response = self.searcher.search(None, doc_type="not_test_doc")
-        self.assertEqual(response["total"], 1)
-
     def test_find_string(self):
         """ Find a string within the object "content" node """
         test_string = "A test string"
@@ -132,12 +115,6 @@ class MockSearchTests(TestCase, SearcherMixin):
 
         response = self.searcher.search_string(test_string)
         self.assertEqual(response["total"], 2)
-
-        response = self.searcher.search_string(test_string, doc_type="test_doc")
-        self.assertEqual(response["total"], 1)
-
-        response = self.searcher.search_string("something else")
-        self.assertEqual(response["total"], 0)
 
         self.searcher.index("test_doc", [{"content": {"deep": {"down": test_string}}}])
         response = self.searcher.search_string(test_string)
@@ -783,7 +760,7 @@ class MockSearchTests(TestCase, SearcherMixin):
         self.assertNotIn("FAKE_ID_4", result_ids)
         self.assertIn("FAKE_ID_5", result_ids)
 
-    def _index_for_facets(self):
+    def _index_for_aggs(self):
         """ Prepare index for facet tests """
         self.searcher.index("test_doc", [{"id": "FAKE_ID_1", "subject": "mathematics", "org": "edX"}])
         self.searcher.index("test_doc", [{"id": "FAKE_ID_2", "subject": "mathematics", "org": "MIT"}])
@@ -795,11 +772,11 @@ class MockSearchTests(TestCase, SearcherMixin):
 
     def test_faceted_search(self):
         """ Test that faceting works well """
-        self._index_for_facets()
+        self._index_for_aggs()
 
         response = self.searcher.search()
         self.assertEqual(response["total"], 7)
-        self.assertNotIn("facets", response)
+        self.assertNotIn("aggs", response)
 
         facet_terms = {
             "subject": {},
@@ -807,8 +784,8 @@ class MockSearchTests(TestCase, SearcherMixin):
         }
         response = self.searcher.search(facet_terms=facet_terms)
         self.assertEqual(response["total"], 7)
-        self.assertIn("facets", response)
-        facet_results = response["facets"]
+        self.assertIn("aggs", response)
+        facet_results = response["aggs"]
 
         self.assertEqual(facet_results["subject"]["total"], 6)
         subject_term_counts = facet_results["subject"]["terms"]
@@ -824,7 +801,7 @@ class MockSearchTests(TestCase, SearcherMixin):
 
     def test_filtered_faceted_search(self):
         """ Test that faceting works well alongside filtered results """
-        self._index_for_facets()
+        self._index_for_aggs()
 
         facet_terms = {
             "subject": {},
@@ -832,8 +809,8 @@ class MockSearchTests(TestCase, SearcherMixin):
         }
         response = self.searcher.search(field_dictionary={"org": "Harvard"}, facet_terms=facet_terms)
         self.assertEqual(response["total"], 4)
-        self.assertIn("facets", response)
-        facet_results = response["facets"]
+        self.assertIn("aggs", response)
+        facet_results = response["aggs"]
 
         self.assertEqual(facet_results["subject"]["total"], 3)
         subject_term_counts = facet_results["subject"]["terms"]
@@ -849,8 +826,8 @@ class MockSearchTests(TestCase, SearcherMixin):
 
         response = self.searcher.search(field_dictionary={"subject": ["physics", "history"]}, facet_terms=facet_terms)
         self.assertEqual(response["total"], 3)
-        self.assertIn("facets", response)
-        facet_results = response["facets"]
+        self.assertIn("aggs", response)
+        facet_results = response["aggs"]
 
         self.assertEqual(facet_results["subject"]["total"], 3)
         subject_term_counts = facet_results["subject"]["terms"]

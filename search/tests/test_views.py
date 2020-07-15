@@ -513,19 +513,3 @@ class ElasticSearchUrlTest(TestCase, SearcherMixin):
         code, results = post_request({"search_string": query}, course_id)
         self.assertTrue(199 < code < 300)
         self.assertEqual(results["total"], result_count)
-
-    def test_malformed_query_handling(self):
-        # root
-        code, results = post_request({"search_string": "\"missing quote"})
-        self.assertGreater(code, 499)
-        self.assertEqual(results["error"], 'Your query seems malformed. Check for unmatched quotes.')
-
-        # course ID
-        code, results = post_request({"search_string": "\"missing quote"}, "ABC/DEF/GHI")
-        self.assertGreater(code, 499)
-        self.assertEqual(results["error"], 'Your query seems malformed. Check for unmatched quotes.')
-
-        # course discovery
-        code, results = post_discovery_request({"search_string": "\"missing quote"})
-        self.assertGreater(code, 499)
-        self.assertEqual(results["error"], 'Your query seems malformed. Check for unmatched quotes.')
