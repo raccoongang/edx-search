@@ -326,7 +326,7 @@ class ElasticSearchEngine(SearchEngine):
         if new_properties:
             self._es.indices.put_mapping(
                 index=self.index_name,
-                body={"properties": new_properties,}
+                body={"properties": new_properties, }
             )
             self._clear_mapping(doc_type)
 
@@ -518,7 +518,7 @@ class ElasticSearchEngine(SearchEngine):
 
         if field_dictionary:
             # strict match of transferred fields
-                elastic_queries += _process_field_filters(field_dictionary)
+            elastic_queries += _process_field_filters(field_dictionary)
 
         if filter_dictionary:
             elastic_filters += _process_filters(filter_dictionary)
