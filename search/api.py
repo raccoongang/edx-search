@@ -8,13 +8,18 @@ from .search_engine_base import SearchEngine
 from .result_processor import SearchResultProcessor
 from .utils import DateRange
 
+from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
+
 # Default filters that we support, override using COURSE_DISCOVERY_FILTERS setting if desired
 DEFAULT_FILTER_FIELDS = ["org", "modes", "language"]
 
 
 def course_discovery_filter_fields():
     """ look up the desired list of course discovery filter fields """
-    return getattr(settings, "COURSE_DISCOVERY_FILTERS", DEFAULT_FILTER_FIELDS)
+    return configuration_helpers.get_value(
+        "COURSE_DISCOVERY_FILTERS",
+        getattr(settings, "COURSE_DISCOVERY_FILTERS", DEFAULT_FILTER_FIELDS)
+    )
 
 
 def course_discovery_facets():
