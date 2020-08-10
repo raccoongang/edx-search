@@ -12,7 +12,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 
 from search.elastic import RESERVED_CHARACTERS
 from search.search_engine_base import SearchEngine
-from search.utils import ValueRange, DateRange, _is_iterable
+from search.utils import DateRange, ValueRange, _is_iterable, doc_type_warning
 
 
 def json_date_to_datetime(json_date_string_value):
@@ -292,7 +292,8 @@ class MockSearchEngine(SearchEngine):
         return cls._mock_elastic[index_name]
 
     @classmethod
-    def add_documents(cls, index_name, sources):
+    @doc_type_warning
+    def add_documents(cls, index_name, sources, doc_type=None):  # pylint: disable=unused-argument
         """
         Add documents to index.
         """
@@ -300,7 +301,8 @@ class MockSearchEngine(SearchEngine):
         cls._write_to_file()
 
     @classmethod
-    def remove_documents(cls, index_name, doc_ids):
+    @doc_type_warning
+    def remove_documents(cls, index_name, doc_ids, doc_type=None):  # pylint: disable=unused-argument
         """
         Remove documents by id from index.
         """
@@ -318,7 +320,8 @@ class MockSearchEngine(SearchEngine):
         super(MockSearchEngine, self).__init__(index)
         MockSearchEngine.load_index(self.index_name)
 
-    def index(self, sources):  # pylint: disable=arguments-differ
+    @doc_type_warning
+    def index(self, sources, doc_type=None):  # pylint: disable=arguments-differ
         """
         Add/update documents to the index.
         """
@@ -327,7 +330,8 @@ class MockSearchEngine(SearchEngine):
             MockSearchEngine.remove_documents(self.index_name, doc_ids)
             MockSearchEngine.add_documents(self.index_name, sources)
 
-    def remove(self, doc_ids):  # pylint: disable=arguments-differ
+    @doc_type_warning
+    def remove(self, doc_ids, doc_type=None):  # pylint: disable=arguments-differ
         """
         Remove documents with given ids from the index.
         """

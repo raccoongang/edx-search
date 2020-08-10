@@ -7,10 +7,10 @@ import logging
 from django.conf import settings
 from django.core.cache import cache
 from elasticsearch import Elasticsearch, exceptions
-from elasticsearch.helpers import bulk, BulkIndexError
+from elasticsearch.helpers import BulkIndexError, bulk
 
 from search.search_engine_base import SearchEngine
-from search.utils import ValueRange, _is_iterable
+from search.utils import ValueRange, _is_iterable, doc_type_warning
 
 # log appears to be standard name used for logger
 log = logging.getLogger(__name__)
@@ -246,21 +246,24 @@ class ElasticSearchEngine(SearchEngine):
     """
 
     @staticmethod
-    def get_cache_item_name(index_name):
+    @doc_type_warning
+    def get_cache_item_name(index_name, doc_type=None):  # pylint: disable=unused-argument
         """
         Name-formatter for cache_item_name
         """
         return "elastic_search_mappings_{}".format(index_name)
 
     @classmethod
-    def get_mappings(cls, index_name):
+    @doc_type_warning
+    def get_mappings(cls, index_name, doc_type=None):  # pylint: disable=unused-argument
         """
         Fetch mapped-items structure from cache
         """
         return cache.get(cls.get_cache_item_name(index_name), {})
 
     @classmethod
-    def set_mappings(cls, index_name, mappings):
+    @doc_type_warning
+    def set_mappings(cls, index_name, mappings, doc_type=None):  # pylint: disable=unused-argument
         """
         Set new mapped-items structure into cache
         """
@@ -317,7 +320,8 @@ class ElasticSearchEngine(SearchEngine):
 
         return mapping
 
-    def _clear_mapping(self):
+    @doc_type_warning
+    def _clear_mapping(self, doc_type=None):  # pylint: disable=unused-argument
         """
         Remove the cached mappings.
 
@@ -332,7 +336,8 @@ class ElasticSearchEngine(SearchEngine):
         if not self._es.indices.exists(index=self.index_name):
             self._es.indices.create(index=self.index_name)
 
-    def _check_mappings(self, body):
+    @doc_type_warning
+    def _check_mappings(self, body, doc_type=None):  # pylint: disable=unused-argument
         """
         Put mapping to the index.
 
@@ -402,7 +407,8 @@ class ElasticSearchEngine(SearchEngine):
             )
             self._clear_mapping()
 
-    def index(self, sources, **kwargs):
+    @doc_type_warning
+    def index(self, sources, doc_type=None, **kwargs):
         """
         Implements call to add documents to the ES index.
 
@@ -433,7 +439,8 @@ class ElasticSearchEngine(SearchEngine):
             log.exception("Error during ES bulk operation.")
             raise
 
-    def remove(self, doc_ids, **kwargs):
+    @doc_type_warning
+    def remove(self, doc_ids, doc_type=None, **kwargs):
         """
         Implements call to remove the documents from the index
         """

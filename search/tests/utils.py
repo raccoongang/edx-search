@@ -6,6 +6,7 @@ from elasticsearch import Elasticsearch, exceptions
 from search.search_engine_base import SearchEngine
 from search.tests.mock_search_engine import MockSearchEngine
 from search.elastic import ElasticSearchEngine
+from search.utils import doc_type_warning
 
 
 TEST_INDEX_NAME = "test_index"
@@ -50,11 +51,13 @@ class ForceRefreshElasticSearchEngine(ElasticSearchEngine):
     so that tests can relaibly search right afterward
     """
 
-    def index(self, sources, **kwargs):
+    @doc_type_warning
+    def index(self, sources, doc_type=None, **kwargs):
         kwargs["refresh"] = True
         super(ForceRefreshElasticSearchEngine, self).index(sources, **kwargs)
 
-    def remove(self, doc_ids, **kwargs):
+    @doc_type_warning
+    def remove(self, doc_ids, doc_type=None, **kwargs):
         kwargs["refresh"] = True
         super(ForceRefreshElasticSearchEngine, self).remove(doc_ids, **kwargs)
 
@@ -73,7 +76,8 @@ class ErroringSearchEngine(MockSearchEngine):
 class ErroringIndexEngine(MockSearchEngine):
     """ Override to generate search engine error to test """
 
-    def index(self, sources, **kwargs):  # pylint: disable=unused-argument, arguments-differ
+    @doc_type_warning
+    def index(self, sources, doc_type=None, **kwargs):  # pylint: disable=unused-argument, arguments-differ
         raise Exception("There is a problem here")
 
 

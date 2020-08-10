@@ -3,7 +3,7 @@
 
 from django.conf import settings
 
-from .utils import _load_class
+from .utils import _load_class, doc_type_warning
 
 
 class SearchEngine:
@@ -17,13 +17,15 @@ class SearchEngine:
         if index:
             self.index_name = index
 
-    def index(self, sources, **kwargs):
+    @doc_type_warning
+    def index(self, sources, doc_type=None, **kwargs):
         """
         Add documents to the search index.
         """
         raise NotImplementedError
 
-    def remove(self, doc_ids, **kwargs):
+    @doc_type_warning
+    def remove(self, doc_ids, doc_type=None, **kwargs):
         """
         Remove documents by ids from the search index.
         """
