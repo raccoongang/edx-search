@@ -1,7 +1,9 @@
 """ Utility classes to support others """
 
+import functools
 import importlib
 import collections
+import warnings
 
 
 def _load_class(class_path, default):
@@ -65,3 +67,27 @@ class DateRange(ValueRange):
     def lower_string(self):
         """ use isoformat for _lower date's string format """
         return self._lower.isoformat()
+
+
+# FIXME: delete this method when ES index doc_type parameter
+#  will be removed from the edx-platform
+def doc_type_warning(func):
+    """
+    Raise deprecation warning.
+
+    Decorator which mark function with doc_type parameter as deprecated.
+    This method needs for compatibility with interface that still use
+    doc_types and should be removed with doc_types from this lib.
+    """
+    @functools.wraps(func)
+    def wrapper(self_or_cls, *args, **kwargs):
+        doc_type = kwargs.pop("doc_type", None)
+        if doc_type is not None:
+            warnings.simplefilter('always', DeprecationWarning)
+            warnings.warn(
+                "doc_type doesn't support by ES7 and it not used by edx-search search engines.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+        return func(self_or_cls, *args, **kwargs)
+    return wrapper

@@ -22,6 +22,15 @@ requirements:
 validate: clean
 	tox
 
+test.run_elasticsearch:
+	docker-compose up -d
+
+test.stop_elasticsearch:
+	docker-compose stop
+
+test: clean test.run_elasticsearch
+	coverage run --source='.' manage.py test
+	make test.stop_elasticsearch
 
 upgrade: export CUSTOM_COMPILE_COMMAND=make upgrade
 upgrade: ## update the requirements/*.txt files with the latest packages satisfying requirements/*.in

@@ -6,14 +6,17 @@ from elasticsearch import Elasticsearch, exceptions
 from search.search_engine_base import SearchEngine
 from search.tests.mock_search_engine import MockSearchEngine
 from search.elastic import ElasticSearchEngine
+from search.utils import doc_type_warning
 
 
 TEST_INDEX_NAME = "test_index"
 
 
 def post_request(body, course_id=None):
-    """ Helper method to post the request and process the response """
-    address = '/' if course_id is None else '/{}'.format(course_id)
+    """
+    Helper method to post the request and process the response
+    """
+    address = '/{}'.format(course_id if course_id else '')
     response = Client().post(address, body)
 
     return getattr(response, "status_code", 500), json.loads(getattr(response, "content", None).decode('utf-8'))
@@ -48,17 +51,15 @@ class ForceRefreshElasticSearchEngine(ElasticSearchEngine):
     so that tests can relaibly search right afterward
     """
 
-    def index(self, doc_type, sources, **kwargs):
-        kwargs.update({
-            "refresh": True
-        })
-        super(ForceRefreshElasticSearchEngine, self).index(doc_type, sources, **kwargs)
+    @doc_type_warning
+    def index(self, sources, doc_type=None, **kwargs):
+        kwargs["refresh"] = True
+        super(ForceRefreshElasticSearchEngine, self).index(sources, **kwargs)
 
-    def remove(self, doc_type, doc_ids, **kwargs):
-        kwargs.update({
-            "refresh": True
-        })
-        super(ForceRefreshElasticSearchEngine, self).remove(doc_type, doc_ids, **kwargs)
+    @doc_type_warning
+    def remove(self, doc_ids, doc_type=None, **kwargs):
+        kwargs["refresh"] = True
+        super(ForceRefreshElasticSearchEngine, self).remove(doc_ids, **kwargs)
 
 
 class ErroringSearchEngine(MockSearchEngine):
@@ -75,7 +76,8 @@ class ErroringSearchEngine(MockSearchEngine):
 class ErroringIndexEngine(MockSearchEngine):
     """ Override to generate search engine error to test """
 
-    def index(self, doc_type, sources, **kwargs):  # pylint: disable=unused-argument, arguments-differ
+    @doc_type_warning
+    def index(self, sources, doc_type=None, **kwargs):  # pylint: disable=unused-argument, arguments-differ
         raise Exception("There is a problem here")
 
 

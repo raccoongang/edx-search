@@ -3,12 +3,13 @@
 
 from django.conf import settings
 
-from .utils import _load_class
+from .utils import _load_class, doc_type_warning
 
 
 class SearchEngine:
-
-    """ Base abstract SearchEngine object """
+    """
+    Base abstract SearchEngine object.
+    """
 
     index_name = "courseware"
 
@@ -16,12 +17,18 @@ class SearchEngine:
         if index:
             self.index_name = index
 
-    def index(self, doc_type, sources, **kwargs):
-        """ This operation is called to add documents of given type to the search index """
+    @doc_type_warning
+    def index(self, sources, doc_type=None, **kwargs):
+        """
+        Add documents to the search index.
+        """
         raise NotImplementedError
 
-    def remove(self, doc_type, doc_ids, **kwargs):
-        """ This operation is called to remove documents of given type from the search index """
+    @doc_type_warning
+    def remove(self, doc_ids, doc_type=None, **kwargs):
+        """
+        Remove documents by ids from the search index.
+        """
         raise NotImplementedError
 
     def search(self,
@@ -29,23 +36,29 @@ class SearchEngine:
                field_dictionary=None,
                filter_dictionary=None,
                exclude_dictionary=None,
-               facet_terms=None,
+               agg_terms=None,
                **kwargs):  # pylint: disable=too-many-arguments
-        """ This operation is called to search for matching documents within the search index """
+        """
+        Search for matching documents within the search index.
+        """
         raise NotImplementedError
 
     def search_string(self, query_string, **kwargs):
-        """ Helper function when primary search is for a query string """
+        """
+        Helper function when primary search is for a query string.
+        """
         return self.search(query_string=query_string, **kwargs)
 
     def search_fields(self, field_dictionary, **kwargs):
-        """ Helper function when primary search is for a set of matching fields """
+        """
+        Helper function when primary search is for a set of matching fields.
+        """
         return self.search(field_dictionary=field_dictionary, **kwargs)
 
     @staticmethod
     def get_search_engine(index=None):
         """
-        Returns the desired implementor (defined in settings)
+        Returns the desired implementor (defined in settings).
         """
         search_engine_class = _load_class(getattr(settings, "SEARCH_ENGINE", None), None)
         return search_engine_class(index=index) if search_engine_class else None
