@@ -156,7 +156,7 @@ def sort_courses_by_hardcoded_ids_order(data):
         first_courses.append(course)
 
     sorted_data = dict(data)
-    if first_courses and other_courses:
+    if first_courses:
         sorted_data["programs"][program_index]["courses"] = first_courses + other_courses
 
     return sorted_data
