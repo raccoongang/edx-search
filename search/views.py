@@ -13,6 +13,7 @@ from django.views.decorators.http import require_POST
 from eventtracking import tracker as track
 from .api import QueryParseError, perform_search, course_discovery_search, course_discovery_filter_fields
 from .initializer import SearchInitializer
+from .utils import sort_courses_by_hardcoded_ids_order
 
 # log appears to be standard name used for logger
 log = logging.getLogger(__name__)  # pylint: disable=invalid-name
@@ -193,12 +194,14 @@ def course_discovery(request):
             }
         )
 
-        results = course_discovery_search(
+        original_results = course_discovery_search(
             search_term=search_term,
             size=size,
             from_=from_,
             field_dictionary=field_dictionary,
         )
+
+        results = sort_courses_by_hardcoded_ids_order(original_results)
 
         # Analytics - log search results before sending to browser
         track.emit(
