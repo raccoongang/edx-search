@@ -153,7 +153,8 @@ def sort_courses_by_hardcoded_ids_order(data):
     # Populate the courses of interest i.e. the ones we reorder
     for config_key in COURSES_ORDER:
         course = unsorted_first_courses_data.get(config_key)
-        first_courses.append(course)
+        if course:
+            first_courses.append(course)
 
     sorted_data = dict(data)
     if first_courses and program_index is not None:
