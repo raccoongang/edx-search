@@ -10,6 +10,7 @@ log = logging.getLogger(__name__)  # pylint: disable=invalid-name
 COURSES_ORDER = [
     "course-v1:Lakeside+TE101+2019",  # The Essentials of Trauma - The Opioid Crisis
     "course-v1:NeuroLogic+NL101+2020Q2",  # The Trauma-Informed Classroom
+    "course-v1:Neurologic+NCS101+2021_T2",  # NeuroLogic Coaching Sessions
     "course-v1:Neurologic+NL105+2021_T1",  # Resilience: Increasing Students' Tolerance for Stress
     "course-v1:LakesideGlobalInstitute+2000+2020_T1",  # Enhancing Trauma Awareness
     "course-v1:Lakeside+PRE1101+2020",  # PRESENCE - Introductory Track
