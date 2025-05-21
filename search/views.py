@@ -187,7 +187,7 @@ def course_discovery(request):
             size=size,
             from_=from_,
             field_dictionary=field_dictionary,
-            enable_course_sorting_by_start_date=True,
+            enable_course_sorting_by_start_date=enable_course_sorting_by_start_date,
         )
 
         # Analytics - log search results before sending to browser

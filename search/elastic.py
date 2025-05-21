@@ -682,7 +682,7 @@ class ElasticSearchEngine(SearchEngine):
             res.append(updated_entry)
         return res
 
-    def _update_sort_entry_if_needed(entry, field):
+    def _update_sort_entry_if_needed(self, entry: dict, field: SortField):
         """
         Update sort entry if needed.
         """

@@ -1,3 +1,6 @@
+"""
+Defines the dataclasses used in the search module.
+"""
 from dataclasses import dataclass
 
 

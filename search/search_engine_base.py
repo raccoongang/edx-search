@@ -43,7 +43,7 @@ class SearchEngine:
         """
         raise NotImplementedError
 
-    def _transform_sort_by(fields: list[SortField]):
+    def _transform_sort_by(self, fields: list[SortField]):
         """
         Helper function to transform sort_by dictionary to the format
         expected by the search engine.
@@ -56,8 +56,8 @@ class SearchEngine:
                filter_dictionary=None,
                exclude_dictionary=None,
                aggregation_terms=None,
-               log_search_params=False,
                sort_by=None,
+               log_search_params=False,
                **kwargs):  # pylint: disable=too-many-arguments
         """
         Search for matching documents within the search index.
