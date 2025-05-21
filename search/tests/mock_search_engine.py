@@ -406,6 +406,13 @@ class MockSearchEngine(SearchEngine):
             sorted(search_results, key=lambda k: k["score"])
         )
 
+        if sort_by:
+            for field in sort_by:
+                results.sort(
+                    key=lambda x, sk=field: _find_field(x["data"], sk.name),
+                    reverse=field.order == "desc"
+                )
+
         response = {
             "took": 10,
             "total": len(search_results),

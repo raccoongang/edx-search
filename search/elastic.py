@@ -675,17 +675,11 @@ class ElasticSearchEngine(SearchEngine):
         Helper function to transform sort_by dictionary to the format
         expected by the search engine.
         """
-        res = []
-        for field in fields:
-            entry = {field.name: {"order": field.order}}
-            updated_entry = self._update_sort_entry_if_needed(entry, field)
-            res.append(updated_entry)
-        return res
-
-    def _update_sort_entry_if_needed(self, entry: dict, field: SortField):
-        """
-        Update sort entry if needed.
-        """
-        if field.type_ == "datetime":
-            entry[field.name]["format"] = "strict_date_optional_time_nanos"
-        return entry
+        return [
+            {
+                field.name: {
+                    "order": field.order,
+                }
+            }
+            for field in fields
+        ]
