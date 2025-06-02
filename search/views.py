@@ -7,6 +7,7 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
+from rest_framework.decorators import APIView
 
 from eventtracking import tracker as track
 from .api import perform_search, course_discovery_search, course_discovery_filter_fields
@@ -16,29 +17,30 @@ from .initializer import SearchInitializer
 log = logging.getLogger(__name__)
 
 
-def _process_pagination_values(request):
+def _process_pagination_values(data_source):
     """ process pagination requests from request parameter """
     size = 20
     page = 0
     from_ = 0
-    if "page_size" in request.POST:
-        size = int(request.POST["page_size"])
+    print("data_source", data_source)
+    if "page_size" in data_source:
+        size = int(data_source["page_size"])
         max_page_size = getattr(settings, "SEARCH_MAX_PAGE_SIZE", 100)
         # The parens below are superfluous, but make it much clearer to the reader what is going on
         if not (0 < size <= max_page_size):  # pylint: disable=superfluous-parens
             raise ValueError(_('Invalid page size of {page_size}').format(page_size=size))
 
-        if "page_index" in request.POST:
-            page = int(request.POST["page_index"])
+        if "page_index" in data_source:
+            page = int(data_source["page_index"])
             from_ = page * size
     return size, from_, page
 
 
-def _process_field_values(request):
+def _process_field_values(data_source):
     """ Create separate dictionary of supported filter values provided """
     return {
-        field_key: request.POST[field_key]
-        for field_key in request.POST
+        field_key: data_source[field_key]
+        for field_key in data_source
         if field_key in course_discovery_filter_fields()
     }
 
@@ -136,8 +138,22 @@ def do_search(request, course_id=None):
     return JsonResponse(results, status=status_code)
 
 
+class CourseDiscoverySearchView(APIView):
+    """
+    Search view for course discovery API requests
+    """
+
+    permission_classes = []
+
+    def post(self, request):
+        """
+        Handle POST requests to search for courses.
+        """
+        return course_discovery(request, is_api=True)
+
+
 @require_POST
-def course_discovery(request):
+def course_discovery(request, is_api=False):
     """
     Search for courses
 
@@ -165,12 +181,14 @@ def course_discovery(request):
     }
     status_code = 500
 
-    search_term = request.POST.get("search_string", None)
-    enable_course_sorting_by_start_date = request.POST.get("enable_course_sorting_by_start_date", False)
+    data_source = request.data if is_api else request.POST
+
+    search_term = data_source.get("search_string", None)
+    enable_course_sorting_by_start_date = data_source.get("enable_course_sorting_by_start_date", False)
 
     try:
-        size, from_, page = _process_pagination_values(request)
-        field_dictionary = _process_field_values(request)
+        size, from_, page = _process_pagination_values(data_source)
+        field_dictionary = _process_field_values(data_source)
 
         # Analytics - log search request
         track.emit(
