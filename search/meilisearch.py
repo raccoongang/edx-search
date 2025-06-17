@@ -408,11 +408,17 @@ def get_filter_rules(
     """
     rules = []
     for key, value in rule_dict.items():
+        # TEMP solution, can broke existing queries
         if isinstance(value, list):
-            for v in value:
-                rules.append(
-                    get_filter_rule(key, v, exclude=exclude, optional=optional)
-                )
+            if getattr(settings, "ENABLE_MULTI_SEARCH", True):
+                rule = (f'{key} = "{v}"' for v in value)
+                rules.append(" OR ".join(rule))
+
+            else:
+                for v in value:
+                    rules.append(
+                        get_filter_rule(key, v, exclude=exclude, optional=optional)
+                    )
         else:
             rules.append(
                 get_filter_rule(key, value, exclude=exclude, optional=optional)

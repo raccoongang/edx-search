@@ -159,11 +159,8 @@ def _get_filter_field(field_name, field_value):
             }
         }
     elif _is_iterable(field_value):
-        filter_query_field = {
-            "terms": {
-                field_name: field_value
-            },
-        }
+        # TEMP solution, can broke existing queries
+        filter_query_field = [{"terms": {field_name: value}} for value in field_value]
     return filter_query_field
 
 
