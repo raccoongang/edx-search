@@ -418,9 +418,13 @@ class TestMeilisearchCourseDiscoverySearch(TestCase, SearcherMixin):
     """
     Integration tests using real Meilisearch engine.
     """
-
+    meilisearch_client = get_meilisearch_client()
     def setUp(self):
         super().setUp()
+        try:
+            self.meilisearch_client.get_index(TEST_INDEX_NAME).delete()
+        except Exception:
+            pass
         create_indexes({TEST_INDEX_NAME: [
             "language",
             "modes",
@@ -431,22 +435,11 @@ class TestMeilisearchCourseDiscoverySearch(TestCase, SearcherMixin):
         ]})
         self.wait_for_meilisearch_indexing()
 
-    def tearDown(self):
-        client = get_meilisearch_client()
-        try:
-            client.index(TEST_INDEX_NAME).delete()
-        except meilisearch.errors.MeilisearchApiError:
-            pass
-        super().tearDown()
-
-    @staticmethod
-    def wait_for_meilisearch_indexing():
-        from search.meilisearch import get_meilisearch_client
-        client = get_meilisearch_client()
-        task = client.index(TEST_INDEX_NAME).get_tasks().results[-1]
+    def wait_for_meilisearch_indexing(self):
+        task = self.meilisearch_client.index(TEST_INDEX_NAME).get_tasks().results[-1]
         if not task:
             return
-        client.wait_for_task(task.uid)
+        self.meilisearch_client.wait_for_task(task.uid)
         time.sleep(0.2)
 
     def test_course_matching_empty_index(self):
