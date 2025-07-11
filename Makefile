@@ -66,7 +66,8 @@ test-meili: meili-up
 	MEILISEARCH_URL=http://localhost:7700 \
 	pytest -v \
 	    search/tests/test_meilisearch.py \
-	    search/tests/test_course_discovery.py -k Meilisearch || true
+	    search/tests/test_course_discovery.py -k Meilisearch \
+	    search/tests/test_course_discovery_views.py -k Meilisearch || true
 	@$(MAKE) meili-down
 
 meili-up:
