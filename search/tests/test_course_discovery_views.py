@@ -3,7 +3,7 @@
 from django.test.utils import override_settings
 
 from search.tests.tests import TEST_INDEX_NAME
-from search.tests.utils import post_discovery_request
+from search.tests.utils import post_discovery_request, SearcherMixin
 from .test_views import MockSearchUrlTest
 from .test_course_discovery import DemoCourse
 
