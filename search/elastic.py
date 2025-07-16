@@ -97,18 +97,18 @@ def _translate_hits(es_response, aggregation_terms, is_multivalue=False):
         translated_result["score"] = translated_result.pop("_score")
         return translated_result
 
-    def translate_agg_bucket(facet_name, agg_result):
+    def translate_agg_bucket(bucket, agg_result):
         """
         Convert ES aggregation result following our search engine syntax.
 
         agg_result argument needs for getting total number of
         documents per bucket.
 
-        :param facet_name: string
+        :param bucket: string
         :param agg_result: dict
         :return: dict
         """
-        agg_item = agg_result[facet_name]
+        agg_item = agg_result[bucket]
 
         if is_multivalue:
             values_agg = agg_item["values"]
@@ -123,7 +123,7 @@ def _translate_hits(es_response, aggregation_terms, is_multivalue=False):
                 for bucket in agg_item["buckets"]
             }
             total_docs = (
-                    agg_result[_get_total_doc_key(facet_name)]["value"]
+                    agg_result[_get_total_doc_key(bucket)]["value"]
                     + agg_item["sum_other_doc_count"]
                     + agg_item["doc_count_error_upper_bound"]
             )
