@@ -257,8 +257,10 @@ class ElasticSearchUnitTests(TestCase):
     """
     ElasticSearch tests.
     """
+
     @patch("search.elastic.Elasticsearch")
     def test_multivalue_aggregations_translated_correctly(self, mock_elasticsearch_class):
+        """Tests that multivalue facet aggregations return full facet buckets despite filtering."""
         mock_es = MagicMock()
         mock_elasticsearch_class.return_value = mock_es
 
@@ -322,6 +324,7 @@ class ElasticSearchUnitTests(TestCase):
 
     @patch("search.elastic.Elasticsearch")
     def test_multivalue_with_empty_filters_uses_match_all(self, mock_elasticsearch_class):
+        """Tests that multivalue aggregation works when no filters are applied."""
         mock_es = MagicMock()
         mock_elasticsearch_class.return_value = mock_es
 
@@ -361,6 +364,7 @@ class ElasticSearchUnitTests(TestCase):
 
     @patch("search.elastic.Elasticsearch")
     def test_regular_aggregations_do_not_use_global_aggs(self, mock_elasticsearch_class):
+        """Tests that single-value aggregation does not include global_aggs wrapper."""
         mock_es = MagicMock()
         mock_elasticsearch_class.return_value = mock_es
         mock_es.search.return_value = {
@@ -410,6 +414,7 @@ class ElasticSearchUnitTests(TestCase):
     def test_single_value_calls_process_aggregation_terms(
             self, mock_elasticsearch_class, mock_process_single, mock_process_multi
     ):
+        """Tests that single-value aggregation calls the standard aggregation processor."""
         mock_es = MagicMock()
         mock_elasticsearch_class.return_value = mock_es
         mock_es.search.return_value = {
@@ -459,6 +464,7 @@ class ElasticSearchUnitTests(TestCase):
     def test_multivalue_calls_process_multivalue_aggregations(
             self, mock_elasticsearch_class, mock_process_single, mock_process_multi
     ):
+        """Tests that multivalue aggregation calls the multivalue aggregation processor."""
         mock_es = MagicMock()
         mock_elasticsearch_class.return_value = mock_es
         mock_es.search.return_value = {
