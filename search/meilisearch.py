@@ -70,6 +70,7 @@ import meilisearch
 from django.conf import settings
 from django.utils import timezone
 
+from search.dataclasses import SortField
 from search.search_engine_base import SearchEngine
 from search.utils import ValueRange
 
@@ -109,6 +110,15 @@ INDEX_FILTERABLES: dict[str, list[str]] = {
     ],
 }
 
+INDEX_SORTABLES: dict[str, list[str]] = {
+    getattr(settings, "COURSEWARE_INFO_INDEX_NAME", "course_info"): [
+        "start",  # sort by start date
+    ],
+    getattr(settings, "COURSEWARE_CONTENT_INDEX_NAME", "courseware_content"): [
+        "start",  # sort by start date
+    ],
+}
+
 
 class MeilisearchEngine(SearchEngine):
     """
@@ -129,6 +139,7 @@ class MeilisearchEngine(SearchEngine):
             meilisearch_index_name = get_meilisearch_index_name(self.index_name)
             meilisearch_client = get_meilisearch_client()
             self._meilisearch_index = meilisearch_client.index(meilisearch_index_name)
+            self._meilisearch_index.update_sortable_attributes(INDEX_SORTABLES.get(self.index_name, []))
         return self._meilisearch_index
 
     @property
@@ -160,6 +171,7 @@ class MeilisearchEngine(SearchEngine):
         filter_dictionary=None,
         exclude_dictionary=None,
         aggregation_terms=None,
+        sort_by=None,
         # exclude_ids=None, # deprecated
         # use_field_match=False, # deprecated
         log_search_params=False,
@@ -168,18 +180,55 @@ class MeilisearchEngine(SearchEngine):
         """
         See meilisearch docs: https://www.meilisearch.com/docs/reference/api/search
         """
+        is_multivalue = kwargs.pop("is_multivalue", False)
         opt_params = get_search_params(
             field_dictionary=field_dictionary,
             filter_dictionary=filter_dictionary,
             exclude_dictionary=exclude_dictionary,
             aggregation_terms=aggregation_terms,
+            sort_by=self._transform_sort_by(sort_by) if sort_by else None,
+            is_multivalue=is_multivalue,
             **kwargs,
         )
         if log_search_params:
             logger.info("Search query: opt_params=%s", opt_params)
         meilisearch_results = self.meilisearch_index.search(query_string, opt_params)
-        processed_results = process_results(meilisearch_results, self.index_name)
-        return processed_results
+
+        if is_multivalue:
+            self._expand_facet_distibutions(field_dictionary, query_string, opt_params, meilisearch_results)
+
+        return process_results(meilisearch_results, self.index_name)
+
+    def _expand_facet_distibutions(
+            self,
+            field_dictionary: dict,
+            query_string: str,
+            opt_params: dict,
+            meilisearch_results: dict
+    ) -> dict:
+        """
+        For each selected facet, get all its available options within the selected filters.
+        """
+        for facet in field_dictionary.keys():
+            expanded_facet_distribution = self._get_expanded_distribution(
+                query_string,
+                facet,
+                opt_params.get("filter", []),
+            )
+            meilisearch_results.setdefault("facetDistribution", {})[facet] = expanded_facet_distribution
+
+    def _get_expanded_distribution(self, query: str, facet_to_exclude: str, filter_rules: list) -> dict:
+        """
+        Run a secondary query excluding one facet to get its full distribution.
+        Only return distribution data, without any actual results.
+        """
+        secondary_opt_params = {
+            'facets': [facet_to_exclude],
+            'filter': [rule for rule in filter_rules if not rule.startswith(f"{facet_to_exclude} = ")],
+            'limit': 0,
+        }
+        result = self.meilisearch_index.search(query, secondary_opt_params)
+        return result.get("facetDistribution", {}).get(facet_to_exclude, {})
 
     def remove(self, doc_ids, **kwargs):
         """
@@ -195,6 +244,13 @@ class MeilisearchEngine(SearchEngine):
         doc_pks = [id2pk(doc_id) for doc_id in doc_ids]
         if doc_pks:
             self.meilisearch_index.delete_documents(doc_pks)
+
+    def _transform_sort_by(self, fields: list[SortField]):
+        """
+        Helper function to transform sort_by dictionary to the format
+        expected by the search engine.
+        """
+        return [f"{field.name}:{field.order}" for field in fields]
 
 
 class DocumentEncoder(json.JSONEncoder):
@@ -368,6 +424,7 @@ def get_search_params(
     filter_dictionary=None,
     exclude_dictionary=None,
     aggregation_terms=None,
+    sort_by=None,
     **kwargs,
 ) -> dict[str, t.Any]:
     """
@@ -380,14 +437,18 @@ def get_search_params(
     if aggregation_terms:
         params["facets"] = list(aggregation_terms.keys())
 
+    # Sorting
+    if sort_by:
+        params["sort"] = sort_by
+
     # Exclusion and inclusion filters
     filters = []
     if field_dictionary:
-        filters += get_filter_rules(field_dictionary)
+        filters += get_filter_rules(field_dictionary, or_fields=params.get("facets"))
     if filter_dictionary:
-        filters += get_filter_rules(filter_dictionary, optional=True)
+        filters += get_filter_rules(filter_dictionary, optional=True, or_fields=params.get("facets"))
     if exclude_dictionary:
-        filters += get_filter_rules(exclude_dictionary, exclude=True)
+        filters += get_filter_rules(exclude_dictionary, exclude=True, or_fields=params.get("facets"))
     if filters:
         params["filter"] = filters
 
@@ -401,22 +462,35 @@ def get_search_params(
 
 
 def get_filter_rules(
-    rule_dict: dict[str, t.Any], exclude: bool = False, optional: bool = False
-) -> list[str]:
+    rule_dict: dict[str, t.Any], exclude: bool = False, optional: bool = False, or_fields: list[str] | None = None,
+) -> list[str | list[str]]:
     """
     Convert inclusion/exclusion rules.
     """
+    or_fields = or_fields or []
     rules = []
-    for key, value in rule_dict.items():
-        if isinstance(value, list):
-            for v in value:
-                rules.append(
-                    get_filter_rule(key, v, exclude=exclude, optional=optional)
-                )
+    for field_name, field_value in rule_dict.items():
+        if isinstance(field_value, list):
+            if exclude:
+                # Always flat list of NOT rules
+                for nested_value in field_value:
+                    rules.append(get_filter_rule(field_name, nested_value, exclude=True, optional=optional))
+            else:
+                if field_name in or_fields:
+                    # Multi-value facet → OR logic as a single string
+                    assert not optional, "optional=True not supported in OR filter branch"
+                    or_expr = " OR ".join(f'{field_name} = "{nested_value}"' for nested_value in field_value)
+                    rules.append(or_expr)
+                else:
+                    # Non-facet field → multiple AND rules
+                    rules += [
+                        get_filter_rule(
+                            field_name, nested_value, exclude=exclude, optional=optional
+                        ) for nested_value in field_value
+                    ]
         else:
-            rules.append(
-                get_filter_rule(key, value, exclude=exclude, optional=optional)
-            )
+            rules.append(get_filter_rule(field_name, field_value, exclude=exclude, optional=optional))
+
     return rules
 
 

@@ -1,11 +1,10 @@
 """ High-level view tests"""
-
 from django.test.utils import override_settings
 
 from search.tests.tests import TEST_INDEX_NAME
-from search.tests.utils import post_discovery_request
+from search.tests.utils import post_discovery_request, setup_democourse
+from search.tests.factories import DemoCourse
 from .test_views import MockSearchUrlTest
-from .test_course_discovery import DemoCourse
 
 
 @override_settings(ELASTIC_FIELD_MAPPINGS={
@@ -23,16 +22,7 @@ class DiscoveryUrlTest(MockSearchUrlTest):
 
     def setUp(self):
         super().setUp()
-        DemoCourse.reset_count()
-        DemoCourse.get_and_index(
-            self.searcher, {"org": "OrgA", "content": {"short_description": "Find this one with the right parameter"}}
-        )
-        DemoCourse.get_and_index(
-            self.searcher, {"org": "OrgB", "content": {"short_description": "Find this one with another parameter"}}
-        )
-        DemoCourse.get_and_index(
-            self.searcher, {"content": {"short_description": "Find this one somehow"}}
-        )
+        setup_democourse(self.searcher)
 
     def test_search_from_url(self):
         """ test searching using the url """

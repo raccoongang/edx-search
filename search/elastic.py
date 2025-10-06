@@ -9,6 +9,7 @@ from django.core.cache import cache
 from elasticsearch import Elasticsearch, exceptions
 from elasticsearch.helpers import bulk, BulkIndexError
 
+from search.dataclasses import SortField
 from search.search_engine_base import SearchEngine
 from search.utils import ValueRange, _is_iterable
 
@@ -22,7 +23,7 @@ log = logging.getLogger(__name__)
 RESERVED_CHARACTERS = "+=><!(){}[]^~*:\\/&|?"
 
 
-def _translate_hits(es_response):
+def _translate_hits(es_response, aggregation_terms, is_multivalue=False):
     """
     Provide result set in our desired format from elasticsearch results.
 
@@ -98,7 +99,7 @@ def _translate_hits(es_response):
 
     def translate_agg_bucket(bucket, agg_result):
         """
-        Any conversion from ES aggregations result into our search engine syntax
+        Convert ES aggregation result following our search engine syntax.
 
         agg_result argument needs for getting total number of
         documents per bucket.
@@ -108,19 +109,29 @@ def _translate_hits(es_response):
         :return: dict
         """
         agg_item = agg_result[bucket]
-        terms = {
-            bucket["key"]: bucket["doc_count"]
-            for bucket in agg_item["buckets"]
-        }
-        total_docs = (
-            agg_result[_get_total_doc_key(bucket)]["value"]
-            + agg_item["sum_other_doc_count"]
-            + agg_item["doc_count_error_upper_bound"]
-        )
+
+        if is_multivalue:
+            values_agg = agg_item["values"]
+            terms = {
+                bucket["key"]: bucket["doc_count"]
+                for bucket in values_agg["buckets"]
+            }
+            total_docs = sum(terms.values())
+        else:
+            terms = {
+                bucket["key"]: bucket["doc_count"]
+                for bucket in agg_item["buckets"]
+            }
+            total_docs = (
+                agg_result[_get_total_doc_key(bucket)]["value"]
+                + agg_item["sum_other_doc_count"]
+                + agg_item["doc_count_error_upper_bound"]
+            )
+
         return {
             "terms": terms,
             "total": total_docs,
-            "other": agg_item["sum_other_doc_count"],
+            "other": agg_item.get("sum_other_doc_count", 0),
         }
 
     results = list(map(translate_result, es_response["hits"]["hits"]))
@@ -131,11 +142,19 @@ def _translate_hits(es_response):
         "results": results,
     }
     if "aggregations" in es_response:
-        response["aggs"] = {
-            bucket: translate_agg_bucket(bucket, es_response["aggregations"])
-            for bucket in es_response["aggregations"]
-            if "total_" not in bucket
-        }
+        if is_multivalue:
+            global_aggs = es_response["aggregations"].get("global_aggs", {})
+            response["aggs"] = {
+                facet: translate_agg_bucket(facet, global_aggs)
+                for facet in global_aggs
+                if facet in aggregation_terms
+            }
+        else:
+            response["aggs"] = {
+                bucket: translate_agg_bucket(bucket, es_response["aggregations"])
+                for bucket in es_response["aggregations"]
+                if "total_" not in bucket
+            }
 
     return response
 
@@ -238,6 +257,51 @@ def _process_aggregation_terms(aggregation_terms):
         }
 
     return elastic_aggs
+
+
+def _process_multivalue_aggregations(aggregation_terms: dict, field_dictionary: dict) -> dict:
+    """
+    Compute the aggregation requests that we'll send with the query when searching with multi-value faceting.
+    Typical shape of the args:
+        aggregation_terms={'language': {}, 'modes': {}, 'org': {}}
+        field_dictionary={'enrollment_start': <search.utils.DateRange object at ...>,
+                          'language': ['en', 'fr']}
+    """
+    aggs = {}
+    for facet_field, options in aggregation_terms.items():
+        filters_excluding_facet = {
+            field: value for field, value in field_dictionary.items()
+            if field != facet_field
+        }
+        filter_clauses = [
+            _get_filter_field(field, value)
+            for field, value in filters_excluding_facet.items()
+            if value
+        ]
+        facet_filter = {
+            "bool": {
+                "must": filter_clauses
+            }
+        } if filter_clauses else {"match_all": {}}
+
+        aggs[facet_field] = {
+            "filter": facet_filter,
+            "aggs": {
+                "values": {
+                    "terms": {
+                        "field": facet_field,
+                        **options
+                    }
+                }
+            }
+        }
+
+    return {
+        "global_aggs": {
+            "global": {},
+            "aggs": aggs
+        }
+    }
 
 
 class ElasticSearchEngine(SearchEngine):
@@ -477,6 +541,7 @@ class ElasticSearchEngine(SearchEngine):
                exclude_dictionary=None,
                aggregation_terms=None,
                exclude_ids=None,
+               sort_by=None,
                use_field_match=False,
                log_search_params=False,
                **kwargs):
@@ -652,8 +717,15 @@ class ElasticSearchEngine(SearchEngine):
                 }
 
         body = {"query": query}
+
+        is_multivalue = kwargs.pop("is_multivalue", False)
         if aggregation_terms:
-            body["aggs"] = _process_aggregation_terms(aggregation_terms)
+            if is_multivalue:
+                body["aggs"] = _process_multivalue_aggregations(aggregation_terms, field_dictionary)
+            else:
+                body["aggs"] = _process_aggregation_terms(aggregation_terms)
+        if sort_by:
+            body["sort"] = self._transform_sort_by(sort_by)
 
         if log_search_params:
             log.info(f"full elastic search body {body}")
@@ -664,4 +736,18 @@ class ElasticSearchEngine(SearchEngine):
             log.exception("error while searching index - %r", ex)
             raise
 
-        return _translate_hits(es_response)
+        return _translate_hits(es_response, aggregation_terms, is_multivalue)
+
+    def _transform_sort_by(self, fields: list[SortField]):
+        """
+        Helper function to transform sort_by dictionary to the format
+        expected by the search engine.
+        """
+        return [
+            {
+                field.name: {
+                    "order": field.order,
+                }
+            }
+            for field in fields
+        ]
